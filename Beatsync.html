@@ -1,0 +1,1180 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>BeatSync Studio v4</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: system-ui,-apple-system,sans-serif; background:#0b0d12; color:#e7e9ee; }
+  header { padding:14px 20px; border-bottom:1px solid #1e2430; display:flex; align-items:center; gap:10px; }
+  h1 { font-size:15px; margin:0; font-weight:600; }
+  h3 { font-size:13px; margin:18px 0 8px; color:#9aa4b8; text-transform:uppercase; letter-spacing:.06em; }
+  .badge { font-size:12px; background:#1b2230; padding:3px 9px; border-radius:20px; color:#9aa4b8; }
+  .wrap { padding:20px; max-width:1100px; margin:0 auto; display:grid; gap:14px; }
+  .drop { border:2px dashed #2c3444; border-radius:14px; padding:34px; text-align:center;
+          cursor:pointer; background:#10141c; transition:.15s; }
+  .drop.hover { border-color:#5b8def; background:#141a26; }
+  .drop b { color:#5b8def; }
+  canvas { width:100%; display:block; background:#0e1219; border-radius:12px; }
+  .row { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+  button { background:#5b8def; color:#fff; border:0; border-radius:9px;
+           padding:9px 15px; font-size:14px; cursor:pointer; font-weight:500; }
+  button:disabled { opacity:.4; cursor:default; }
+  button.ghost { background:#1b2230; }
+  .stat { font-variant-numeric: tabular-nums; color:#9aa4b8; font-size:13px; }
+  label { font-size:13px; color:#9aa4b8; display:flex; align-items:center; gap:7px; }
+  select, input[type=text], input[type=number] { background:#141a25; color:#e7e9ee;
+      border:1px solid #2a3242; border-radius:7px; padding:6px 9px; font-size:13px; }
+  textarea { width:100%; min-height:140px; background:#0f141d; color:#dbe1ec; border:1px solid #2a3242;
+      border-radius:10px; padding:12px; font:13px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace; resize:vertical; }
+  .hidden { display:none !important; }
+  .scene { display:flex; gap:10px; align-items:center; padding:8px 10px; background:#10141c;
+           border:1px solid #1e2430; border-radius:9px; margin-bottom:6px; font-size:13px; }
+  .scene .time { color:#9aa4b8; font-variant-numeric:tabular-nums; min-width:110px; }
+  .scene .tag { font-size:11px; padding:2px 7px; border-radius:20px; background:#1b2230; color:#9aa4b8; }
+  .scene .tag.loud { background:#2a2033; color:#c79bff; }
+  #status { font-size:13px; color:#9aa4b8; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>BeatSync Studio v4</h1>
+  <span class="badge">local · nothing uploaded</span>
+  <span id="status"></span>
+</header>
+
+<div class="wrap">
+
+  <div id="drop" class="drop">
+    <div style="font-size:15px">Drop an <b>MP3</b>, WAV, M4A or OGG here</div>
+    <div class="stat" style="margin-top:6px">or click to choose — the audio never leaves your machine</div>
+    <input id="file" type="file" accept="audio/*" class="hidden" />
+  </div>
+
+  <div id="studio" class="hidden" style="display:grid; gap:14px">
+    <canvas id="wave" height="100"></canvas>
+
+    <div class="row">
+      <button id="play">▶ Play</button>
+      <button id="record" class="ghost">⬇ Export video</button>
+      <label>Format
+        <select id="aspect">
+          <option value="16:9">16:9 — YouTube</option>
+          <option value="9:16">9:16 — Reels/TikTok</option>
+          <option value="1:1">1:1 — Instagram</option>
+        </select>
+      </label>
+      <label>Cut
+        <select id="cut">
+          <option value="cut">Hard cut</option>
+          <option value="fade">Crossfade</option>
+          <option value="beatflash">Flash on beat</option>
+        </select>
+      </label>
+      <span id="info" class="stat"></span>
+    </div>
+
+    <div class="row">
+      <label>Visuals
+        <select id="source">
+          <option value="generative">Generative (no images needed)</option>
+          <option value="images">Images</option>
+        </select>
+      </label>
+      <label id="styleWrap">Style
+        <select id="style">
+          <option value="gradient">Gradient flow</option>
+          <option value="particles">Particles</option>
+          <option value="kaleidoscope">Kaleidoscope</option>
+          <option value="ribbon">Waveform ribbon</option>
+          <option value="bars">Minimal bars</option>
+        </select>
+      </label>
+      <label>Accent <input id="accent" type="color" value="#5b8def" /></label>
+      <label><input type="checkbox" id="hud" checked /> HUD</label>
+    </div>
+
+    <div class="row" id="imgRow">
+      <label>Images <input id="imgs" type="file" accept="image/*" multiple /></label>
+      <button id="shuffle" class="ghost">Re-assign images</button>
+      <span class="stat" id="imgCount">0 images</span>
+    </div>
+
+    <canvas id="preview"></canvas>
+
+    <div id="scenesBlock">
+      <div class="stat">Scenes are auto-detected from the song's energy. Pick which image goes where.</div>
+      <h3>Scenes</h3>
+      <div id="sceneList"></div>
+    </div>
+
+    <h3>Lyrics</h3>
+    <textarea id="lyrics" placeholder="Paste your lyrics here.
+
+One line per line. Blank lines separate verses.
+
+No timestamps needed — lines are spread across the song and snapped to beats."></textarea>
+    <div class="row">
+      <button id="distribute">Distribute across song</button>
+      <button id="clearLyrics" class="ghost">Clear</button>
+      <label>Position
+        <select id="textPos">
+          <option value="bottom">Bottom</option>
+          <option value="center">Center</option>
+        </select>
+      </label>
+      <label><input type="checkbox" id="lyricVisuals" checked /> Vary visuals per verse</label>
+      <span id="lyricInfo" class="stat"></span>
+    </div>
+
+    <h3>Manual captions</h3>
+    <div class="row">
+      <input id="textInput" type="text" placeholder="Type a caption…" style="min-width:260px" />
+      <button id="addText">Add at playhead</button>
+    </div>
+    <div id="textList"></div>
+
+  </div>
+
+</div>
+
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+
+/* ================= state ================= */
+const state = {
+  audioCtx:null, buffer:null, mono:null, bpm:0, onsets:[], beatFrames:[], fps:86.13,
+  scenes:[], images:[], texts:[],
+  playing:false, startedAt:0, playhead:0, rafId:0, lastT:0,
+  source:null, analyser:null, gain:null,
+  recorder:null, chunks:[], recording:false,
+  particles:[], bands:{bass:0,mid:0,treble:0}, palette:[],
+  hueCur:0, hueTarget:0, palCache:{}
+};
+
+/* ================= FFT ================= */
+function fft(re, im) {
+  const n = re.length;
+  for (let i = 1, j = 0; i < n; i++) {
+    let bit = n >> 1;
+    for (; j & bit; bit >>= 1) j ^= bit;
+    j ^= bit;
+    if (i < j) { let t=re[i]; re[i]=re[j]; re[j]=t; t=im[i]; im[i]=im[j]; im[j]=t; }
+  }
+  for (let len = 2; len <= n; len <<= 1) {
+    const ang = -2*Math.PI/len, wr = Math.cos(ang), wi = Math.sin(ang);
+    for (let i = 0; i < n; i += len) {
+      let cwr = 1, cwi = 0;
+      for (let k = 0; k < (len >> 1); k++) {
+        const a = i+k, b = i+k+(len>>1);
+        const vr = re[b]*cwr - im[b]*cwi, vi = re[b]*cwi + im[b]*cwr;
+        re[b] = re[a]-vr; im[b] = im[a]-vi;
+        re[a] += vr;      im[a] += vi;
+        const nwr = cwr*wr - cwi*wi;
+        cwi = cwr*wi + cwi*wr; cwr = nwr;
+      }
+    }
+  }
+}
+
+/* ================= colour ================= */
+function hexToRgb(hex) {
+  const n = parseInt(hex.replace('#',''), 16);
+  return { r:(n>>16)&255, g:(n>>8)&255, b:n&255 };
+}
+function hslToHex(h, s, l) {
+  s/=100; l/=100;
+  const k = n => (n + h/30) % 12;
+  const a = s * Math.min(l, 1-l);
+  const f = n => l - a*Math.max(-1, Math.min(k(n)-3, Math.min(9-k(n),1)));
+  const to = x => Math.round(255*x).toString(16).padStart(2,'0');
+  return '#' + to(f(0)) + to(f(8)) + to(f(4));
+}
+function shiftHue(hex, deg) {
+  let { r, g, b } = hexToRgb(hex);
+  r/=255; g/=255; b/=255;
+  const max = Math.max(r,g,b), min = Math.min(r,g,b), d = max-min;
+  let h = 0, s = 0; const l = (max+min)/2;
+  if (d !== 0) {
+    s = l > 0.5 ? d/(2-max-min) : d/(max+min);
+    if (max === r) h = (g-b)/d + (g < b ? 6 : 0);
+    else if (max === g) h = (b-r)/d + 2;
+    else h = (r-g)/d + 4;
+    h *= 60;
+  }
+  return hslToHex((h + deg + 360) % 360, Math.max(35, s*100), Math.min(74, Math.max(46, l*100)));
+}
+function buildPalette() {
+  const a = $('accent').value;
+  state.palette = [a, shiftHue(a, 140), shiftHue(a, -140), shiftHue(a, 45)];
+  state.palCache = {};
+}
+function livePalette() {
+  const key = Math.round(state.hueCur/4)*4;
+  if (state.palCache[key]) return state.palCache[key];
+  const p = state.palette.map(c => shiftHue(c, key));
+  state.palCache[key] = p;
+  if (Object.keys(state.palCache).length > 120) state.palCache = { [key]: p };
+  return p;
+}
+function hexA(hex, a) {
+  const { r, g, b } = hexToRgb(hex);
+  return `rgba(${r},${g},${b},${Math.max(0,Math.min(1,a))})`;
+}
+
+/* ================= onset detection ================= */
+function onsetEnvelope(mono, sr, hop, frame) {
+  const win = new Float32Array(frame);
+  for (let i = 0; i < frame; i++) win[i] = 0.5 - 0.5*Math.cos(2*Math.PI*i/(frame-1));
+  const bins = frame >> 1;
+  const nF = Math.max(0, Math.floor((mono.length - frame)/hop));
+  const flux = new Float32Array(nF);
+  const prev = new Float32Array(bins);
+  const re = new Float32Array(frame), im = new Float32Array(frame);
+  for (let f = 0; f < nF; f++) {
+    const off = f*hop;
+    for (let i = 0; i < frame; i++) { re[i] = mono[off+i]*win[i]; im[i] = 0; }
+    fft(re, im);
+    let sum = 0;
+    for (let k = 0; k < bins; k++) {
+      const mag = Math.hypot(re[k], im[k]);
+      const d = mag - prev[k];
+      if (d > 0) sum += d;
+      prev[k] = mag;
+    }
+    flux[f] = sum;
+  }
+  let max = 0; for (let i = 0; i < nF; i++) if (flux[i] > max) max = flux[i];
+  if (max > 0) for (let i = 0; i < nF; i++) flux[i] /= max;
+  return { flux, fps: sr/hop };
+}
+function pickPeaks(flux, sensitivity) {
+  const N = flux.length, out = [], W = 12;
+  for (let i = 1; i < N-1; i++) {
+    let s = 0, c = 0;
+    for (let j = Math.max(0,i-W); j < Math.min(N,i+W); j++) { s += flux[j]; c++; }
+    const thresh = Math.min(0.9, (s/c)*sensitivity + 0.03);
+    if (flux[i] > thresh && flux[i] >= flux[i-1] && flux[i] > flux[i+1]) out.push(i);
+  }
+  return out;
+}
+
+/* ================= tempo ================= */
+function estimateTempo(flux, fps) {
+  const lagMin = Math.max(2, Math.round(fps*60/200));
+  const lagMax = Math.min(flux.length-1, Math.round(fps*60/55));
+  if (lagMax <= lagMin) return { bpm:0, beatFrames:[] };
+  let best = -1, bestLag = lagMin;
+  for (let lag = lagMin; lag <= lagMax; lag++) {
+    let s = 0, n = flux.length - lag;
+    for (let i = 0; i < n; i++) s += flux[i]*flux[i+lag];
+    s /= n;
+    if (s > best) { best = s; bestLag = lag; }
+  }
+  let bpm = 60*fps/bestLag;
+  while (bpm < 70) bpm *= 2;
+  while (bpm > 185) bpm /= 2;
+  const period = Math.max(1, Math.round(fps*60/bpm));
+  let phase = 0, bestScore = -1;
+  for (let p = 0; p < period; p++) {
+    let s = 0, n = 0;
+    for (let i = p; i < flux.length; i += period) { s += flux[i]; n++; }
+    s = n ? s/n : 0;
+    if (s > bestScore) { bestScore = s; phase = p; }
+  }
+  const beatFrames = [];
+  for (let f = phase; f < flux.length; f += period) beatFrames.push(f);
+  return { bpm, beatFrames };
+}
+
+/* ================= rms + sections ================= */
+function rmsEnvelope(mono, sr, hopSec) {
+  const hop = Math.max(1, Math.floor(sr*hopSec));
+  const n = Math.floor(mono.length/hop);
+  const rms = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    let s = 0; const off = i*hop;
+    for (let j = 0; j < hop; j++) { const v = mono[off+j] || 0; s += v*v; }
+    rms[i] = Math.sqrt(s/hop);
+  }
+  const k = 8, sm = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    let s = 0, c = 0;
+    for (let j = Math.max(0,i-k); j < Math.min(n,i+k); j++) { s += rms[j]; c++; }
+    sm[i] = s/c;
+  }
+  let max = 0; for (const v of sm) if (v > max) max = v;
+  if (max > 0) for (let i = 0; i < n; i++) sm[i] /= max;
+  return sm;
+}
+
+function detectScenes(buf, beatFrames, fps, mono) {
+  const hopSec = 0.1;
+  const sm = rmsEnvelope(mono, buf.sampleRate, hopSec);
+  const dur = buf.duration;
+  let mean = 0; for (const v of sm) mean += v;
+  mean /= sm.length;
+  let segs = [], start = 0, cur = sm[0] > mean*1.05;
+  for (let i = 1; i < sm.length; i++) {
+    const h = sm[i] > mean*1.05;
+    if (h !== cur) { segs.push({ s:start, e:i, loud:cur }); start = i; cur = h; }
+  }
+  segs.push({ s:start, e:sm.length, loud:cur });
+  const minFrames = Math.ceil(2.5/hopSec);
+  const merged = [];
+  for (const g of segs) {
+    if (merged.length && (g.e - g.s) < minFrames) merged[merged.length-1].e = g.e;
+    else merged.push({ ...g });
+  }
+  let scenes = merged
+    .map(g => ({ start: g.s*hopSec, end: Math.min(dur, g.e*hopSec), loud: g.loud }))
+    .filter(g => (g.end - g.start) > 1.5);
+  if (scenes.length < 2) {
+    const n = 4, out = [];
+    for (let i = 0; i < n; i++) out.push({ start: dur*i/n, end: dur*(i+1)/n, loud: i % 2 === 1 });
+    return out;
+  }
+  const beatTimes = beatFrames.map(f => f/fps);
+  const snap = t => {
+    let best = t, d = 0.35;
+    for (const b of beatTimes) { const dd = Math.abs(b-t); if (dd < d) { d = dd; best = b; } }
+    return best;
+  };
+  for (let i = 0; i < scenes.length; i++) {
+    if (i > 0) scenes[i].start = snap(scenes[i].start);
+    if (i < scenes.length-1) scenes[i].end = snap(scenes[i].end);
+  }
+  for (let i = 1; i < scenes.length; i++) scenes[i].start = scenes[i-1].end;
+  scenes[0].start = 0;
+  scenes[scenes.length-1].end = dur;
+  return scenes;
+}
+
+/* ================= active (non-silent) regions ================= */
+function activeRegions(mono, sr) {
+  const hopSec = 0.1;
+  const sm = rmsEnvelope(mono, sr, hopSec);
+  const dur = mono.length/sr;
+  let max = 0; for (const v of sm) if (v > max) max = v;
+  const thr = max*0.14;
+  const runs = [];
+  let cur = null;
+  for (let i = 0; i < sm.length; i++) {
+    if (sm[i] > thr) { if (!cur) cur = { start: i*hopSec, end: (i+1)*hopSec }; else cur.end = (i+1)*hopSec; }
+    else if (cur) { runs.push(cur); cur = null; }
+  }
+  if (cur) runs.push(cur);
+  // merge gaps shorter than 0.9s
+  const merged = [];
+  for (const r of runs) {
+    const last = merged[merged.length-1];
+    if (last && r.start - last.end < 0.9) last.end = r.end;
+    else merged.push({ ...r });
+  }
+  // drop slivers
+  const out = merged.filter(r => r.end - r.start > 1.5);
+  if (!out.length) return [{ start: 0, end: dur }];
+  out[0].start = 0;
+  out[out.length-1].end = Math.min(dur, out[out.length-1].end + 0.6);
+  return out;
+}
+
+/* ================= lyrics parsing ================= */
+const KEYWORDS = [
+  [/\b(fire|burn|burning|flame|blaze|heat|sun|solar)\b/i,  28,  'particles'],
+  [/\b(rain|water|ocean|sea|wave|river|tear|tears|cry)\b/i, 195, 'ribbon'],
+  [/\b(night|dark|darkness|shadow|black|moon|midnight)\b/i, 248, 'gradient'],
+  [/\b(love|heart|kiss|kissing|touch|close|hold)\b/i,       332, 'gradient'],
+  [/\b(cold|ice|snow|winter|freeze|frozen|blue)\b/i,        205, 'kaleidoscope'],
+  [/\b(dream|dreaming|sleep|float|floating|sky|cloud|clouds)\b/i, 275, 'ribbon'],
+  [/\b(light|lights|shine|shining|star|stars|bright|glow)\b/i, 46, 'particles'],
+  [/\b(run|running|fast|drive|fly|flying|rush|chase)\b/i,     0, 'particles'],
+  [/\b(broken|break|fall|falling|down|lost|alone)\b/i,      268, 'gradient'],
+  [/\b(dance|dancing|move|moving|turn|spin)\b/i,            118, 'kaleidoscope']
+];
+
+function parseLyrics(raw) {
+  const lines = raw.split(/\r?\n/);
+  const out = [];
+  let stanza = 0;
+  let pending = [];
+  const flush = () => {
+    if (pending.length) { out.push({ lines: pending, stanza }); pending = []; stanza++; }
+  };
+  for (const l of lines) {
+    const s = l.trim();
+    if (!s) { flush(); continue; }
+    pending.push(s);
+  }
+  flush();
+  return out;
+}
+
+function keywordFor(line) {
+  for (const [re, hue, style] of KEYWORDS) {
+    if (re.test(line)) return { hue, style };
+  }
+  return null;
+}
+
+function consumeRange(regions, pos, len) {
+  let remaining = len;
+  let startAbs = null;
+  for (const r of regions) {
+    const d = r.end - r.start;
+    if (pos >= d) { pos -= d; continue; }
+    if (startAbs === null) startAbs = r.start + pos;
+    const avail = d - pos;
+    if (remaining <= avail) return { start: startAbs, end: r.start + pos + remaining };
+    remaining -= avail;
+    pos = 0;
+  }
+  const lastEnd = regions[regions.length-1].end;
+  return { start: startAbs === null ? lastEnd : startAbs, end: lastEnd };
+}
+
+function distributeLyrics() {
+  if (!state.buffer) { setStatus('load a song first'); return; }
+  const raw = $('lyrics').value;
+  if (!raw.trim()) { $('lyricInfo').textContent = 'nothing to distribute'; return; }
+
+  const stanzas = parseLyrics(raw);
+  const flat = [];
+  stanzas.forEach((st, si) => {
+    st.lines.forEach((text, li) => {
+      flat.push({ text, stanza: si, line: li, words: Math.max(1, text.split(/\s+/).filter(Boolean).length) });
+    });
+  });
+  if (!flat.length) return;
+
+  const regions = state.activeRegions || activeRegions(state.mono, state.buffer.sampleRate);
+  state.activeRegions = regions;
+  const activeTotal = regions.reduce((a, r) => a + (r.end - r.start), 0);
+  const totalWords = flat.reduce((a, l) => a + l.words, 0);
+
+  // keep a small breath between lines
+  const gap = state.bpm ? (60/state.bpm)*0.5 : 0.25;
+
+  const beatTimes = state.beatFrames.map(f => f/state.fps);
+  const snap = (t, tol) => {
+    let best = t, d = tol;
+    for (const b of beatTimes) { const dd = Math.abs(b-t); if (dd < d) { d = dd; best = b; } }
+    return best;
+  };
+
+  const texts = [];
+  let pos = 0;
+  const span = activeTotal;
+  for (let i = 0; i < flat.length; i++) {
+    const l = flat[i];
+    const share = (l.words/totalWords)*span;
+    const r = consumeRange(regions, pos, Math.max(0.35, share));
+    pos += Math.max(0.35, share);
+
+    let s = snap(r.start, 0.3);
+    let e = snap(r.end, 0.3);
+    if (e - s < 0.6) e = s + 0.6;
+
+    const kw = keywordFor(l.text);
+    const stanzaHue = (l.stanza % 4)*38;
+    texts.push({
+      text: l.text,
+      start: s,
+      end: Math.max(s + 0.4, e - gap*0.35),
+      lyric: true,
+      stanza: l.stanza,
+      hue: kw ? kw.hue : stanzaHue,
+      style: kw ? kw.style : null
+    });
+  }
+
+  // enforce no overlap
+  for (let i = 1; i < texts.length; i++) {
+    if (texts[i].start < texts[i-1].end) texts[i].start = Math.min(texts[i].end - 0.3, texts[i-1].end + 0.02);
+    if (texts[i].end <= texts[i].start) texts[i].end = texts[i].start + 0.5;
+  }
+
+  state.texts = texts;
+  const kwCount = texts.filter(t => t.style).length;
+  $('lyricInfo').textContent =
+    `${texts.length} lines · ${stanzas.length} verses · ${kwCount} keyword-driven`;
+  renderTexts();
+  setStatus('lyrics distributed');
+}
+
+/* ================= album art ================= */
+function syncsafe(b, o) {
+  return ((b[o]&0x7f)<<21) | ((b[o+1]&0x7f)<<14) | ((b[o+2]&0x7f)<<7) | (b[o+3]&0x7f);
+}
+function extractAlbumArt(bytes) {
+  try {
+    if (bytes[0] !== 0x49 || bytes[1] !== 0x44 || bytes[2] !== 0x33) return null;
+    const ver = bytes[3];
+    const tagSize = syncsafe(bytes, 6);
+    const end = Math.min(bytes.length, 10 + tagSize);
+    let pos = 10;
+    while (pos + 10 <= end) {
+      const id = String.fromCharCode(bytes[pos],bytes[pos+1],bytes[pos+2],bytes[pos+3]);
+      if (!/^[A-Z0-9]{4}$/.test(id)) break;
+      const size = ver >= 4
+        ? syncsafe(bytes, pos+4)
+        : ((bytes[pos+4]<<24) | (bytes[pos+5]<<16) | (bytes[pos+6]<<8) | bytes[pos+7]);
+      if (size <= 0 || pos + 10 + size > bytes.length) break;
+      const d0 = pos + 10;
+      if (id === 'APIC') {
+        let p = d0;
+        const enc = bytes[p++];
+        let mimeEnd = p;
+        while (mimeEnd < d0+size && bytes[mimeEnd] !== 0) mimeEnd++;
+        const mime = String.fromCharCode.apply(null, bytes.slice(p, mimeEnd)) || 'image/jpeg';
+        p = mimeEnd + 1;
+        p++;
+        if (enc === 1 || enc === 2) {
+          while (p+1 < d0+size && !(bytes[p] === 0 && bytes[p+1] === 0)) p++;
+          p += 2;
+        } else {
+          while (p < d0+size && bytes[p] !== 0) p++;
+          p++;
+        }
+        if (p < d0+size) return new Blob([bytes.slice(p, d0+size)], { type: mime });
+      }
+      pos = d0 + size;
+    }
+  } catch (e) {}
+  return null;
+}
+
+/* ================= spectrum ================= */
+const SPEC_FRAME = 2048;
+function spectrumAt(t) {
+  const buf = state.buffer, sr = buf.sampleRate, frame = SPEC_FRAME;
+  const center = Math.floor(t*sr);
+  let off = center - (frame >> 1);
+  off = Math.max(0, Math.min(Math.max(0, state.mono.length - frame), off));
+  const re = new Float32Array(frame), im = new Float32Array(frame);
+  for (let i = 0; i < frame; i++) {
+    const w = 0.5 - 0.5*Math.cos(2*Math.PI*i/(frame-1));
+    re[i] = (state.mono[off+i] || 0) * w;
+  }
+  fft(re, im);
+  const bins = frame >> 1;
+  const mags = new Float32Array(bins);
+  for (let k = 0; k < bins; k++) mags[k] = Math.hypot(re[k], im[k]);
+  const band = (lo, hi) => {
+    const k0 = Math.max(1, Math.floor(lo*frame/sr));
+    const k1 = Math.min(bins-1, Math.ceil(hi*frame/sr));
+    let s = 0, n = 0;
+    for (let k = k0; k <= k1; k++) { s += mags[k]; n++; }
+    return Math.max(0, Math.min(1, Math.log10(1+(n ? s/n : 0))/2.0));
+  };
+  return { mags, bass: band(20,250), mid: band(250,2000), treble: band(2000,8000) };
+}
+
+/* ================= waveform ================= */
+function drawWave() {
+  const buf = state.buffer, cv = $('wave');
+  const dpr = window.devicePixelRatio || 1;
+  const w = cv.clientWidth, h = 100;
+  cv.width = w*dpr; cv.height = h*dpr;
+  const g = cv.getContext('2d');
+  g.setTransform(dpr,0,0,dpr,0,0);
+  g.clearRect(0,0,w,h);
+  const data = buf.getChannelData(0);
+  const step = Math.max(1, Math.floor(data.length/w));
+  const dur = buf.duration;
+
+  state.scenes.forEach((s, i) => {
+    g.fillStyle = s.loud ? '#241b30' : '#141a25';
+    g.fillRect((s.start/dur)*w, 0, ((s.end-s.start)/dur)*w, h);
+    g.fillStyle = '#9aa4b8';
+    g.font = '11px system-ui, sans-serif';
+    if ((s.end-s.start)/dur*w > 34) g.fillText('S'+(i+1), (s.start/dur)*w + 5, 14);
+  });
+
+  g.fillStyle = '#3a4459';
+  for (let x = 0; x < w; x++) {
+    let min = 1, max = -1; const s = x*step;
+    for (let i = 0; i < step && s+i < data.length; i++) {
+      const v = data[s+i];
+      if (v < min) min = v;
+      if (v > max) max = v;
+    }
+    g.fillRect(x, (1+min)*h/2, 1, Math.max(1, ((1+max)*h/2)-((1+min)*h/2)));
+  }
+
+  g.fillStyle = $('accent').value;
+  for (const f of state.onsets) {
+    const x = ((f/state.fps)/dur)*w;
+    if (x >= 0 && x <= w) g.fillRect(x, h*0.35, 1, h*0.65);
+  }
+  g.fillStyle = '#ffd166';
+  for (const f of state.beatFrames) {
+    const x = ((f/state.fps)/dur)*w;
+    if (x >= 0 && x <= w) g.fillRect(x, 0, 2, h);
+  }
+  g.fillStyle = '#ffffff';
+  g.fillRect((state.playhead/dur)*w, 0, 2, h);
+}
+
+/* ================= size / scenes ================= */
+function targetSize() {
+  const a = $('aspect').value;
+  if (a === '9:16') return [1080, 1920];
+  if (a === '1:1')  return [1080, 1080];
+  return [1920, 1080];
+}
+function sceneIndexAt(t) {
+  for (let i = 0; i < state.scenes.length; i++)
+    if (t >= state.scenes[i].start && t < state.scenes[i].end) return i;
+  return state.scenes.length ? state.scenes.length-1 : -1;
+}
+function beatPulse(t) {
+  if (!state.bpm) return 0;
+  const bd = 60/state.bpm, since = t % bd;
+  return Math.max(0, 1 - since/(bd*0.45));
+}
+
+/* ================= ken burns ================= */
+function drawKenBurns(g, img, W, H, p, alpha, dir) {
+  const base = Math.max(W/img.width, H/img.height);
+  const s = base*(1.08 + 0.14*p);
+  const dw = img.width*s, dh = img.height*s;
+  const slackX = (dw - W)/2, slackY = (dh - H)/2;
+  const px = (p-0.5)*2 * Math.min(slackX, W*0.04) * dir;
+  const py = (p-0.5)*2 * Math.min(slackY, H*0.03) * (dir >= 0 ? 1 : -1);
+  g.globalAlpha = alpha;
+  g.drawImage(img, (W-dw)/2 + px, (H-dh)/2 + py, dw, dh);
+  g.globalAlpha = 1;
+}
+
+/* ================= generative ================= */
+let rngSeed = 1337;
+function rng() { rngSeed = (rngSeed*1103515245 + 12345) & 0x7fffffff; return rngSeed / 0x7fffffff; }
+function resetParticles() { state.particles = []; rngSeed = 1337; }
+function newParticle(W, H, scatter) {
+  const p = {
+    x: scatter ? Math.random()*W : W/2,
+    y: scatter ? Math.random()*H : H/2,
+    vx: (Math.random()-0.5)*60,
+    vy: (Math.random()-0.5)*60,
+    life: 1.5 + Math.random()*2.5,
+    size: 1 + Math.random()*3,
+    ci: Math.floor(Math.random()*4)
+  };
+  p.maxLife = p.life;
+  return p;
+}
+
+function drawGenerative(g, W, H, t, spec, pulse, dt) {
+  const style = state.lyricStyle || $('style').value;
+  const pal = livePalette();
+  const bass = spec.bass, mid = spec.mid, tre = spec.treble;
+
+  g.fillStyle = '#07080c';
+  g.fillRect(0, 0, W, H);
+
+  if (style === 'gradient') {
+    g.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < 3; i++) {
+      const cx = W*(0.5 + 0.34*Math.sin(t*0.31 + i*2.1));
+      const cy = H*(0.5 + 0.30*Math.cos(t*0.24 + i*1.7));
+      const r  = Math.min(W,H)*(0.34 + 0.30*(i===0?bass:i===1?mid:tre) + 0.06*i);
+      const grad = g.createRadialGradient(cx,cy,0,cx,cy,Math.max(1,r));
+      grad.addColorStop(0, hexA(pal[i % pal.length], 0.55));
+      grad.addColorStop(1, hexA(pal[i % pal.length], 0));
+      g.fillStyle = grad;
+      g.fillRect(0,0,W,H);
+    }
+    g.globalCompositeOperation = 'source-over';
+    g.strokeStyle = hexA(pal[0], 0.45 + 0.4*pulse);
+    g.lineWidth = 2 + pulse*4;
+    g.beginPath(); g.moveTo(0, H*0.5); g.lineTo(W, H*0.5); g.stroke();
+
+  } else if (style === 'particles') {
+    if (!state.particles.length) for (let i = 0; i < 160; i++) state.particles.push(newParticle(W,H,true));
+    const cx = W/2, cy = H/2;
+    const emit = Math.round(bass*10 + pulse*14);
+    for (let i = 0; i < emit && state.particles.length < 420; i++) {
+      const p = newParticle(W,H,false);
+      const ang = rng()*Math.PI*2;
+      const spd = 60 + rng()*220*(0.4 + bass);
+      p.x = cx; p.y = cy;
+      p.vx = Math.cos(ang)*spd; p.vy = Math.sin(ang)*spd;
+      state.particles.push(p);
+    }
+    g.globalCompositeOperation = 'lighter';
+    const alive = [];
+    for (const p of state.particles) {
+      p.life -= dt;
+      if (p.life <= 0) continue;
+      p.x += p.vx*dt; p.y += p.vy*dt;
+      p.vx *= 0.985; p.vy *= 0.985;
+      p.vy += 12*dt;
+      const a = Math.max(0, Math.min(1, p.life/p.maxLife));
+      g.fillStyle = hexA(pal[p.ci % pal.length], a*0.9);
+      g.beginPath(); g.arc(p.x, p.y, p.size*(0.6 + a*0.8 + bass*0.7), 0, Math.PI*2); g.fill();
+      alive.push(p);
+    }
+    state.particles = alive;
+    g.globalCompositeOperation = 'source-over';
+    const cr = Math.min(W,H)*(0.05 + bass*0.06 + pulse*0.03);
+    const core = g.createRadialGradient(cx,cy,0,cx,cy,Math.max(1,cr));
+    core.addColorStop(0, hexA(pal[0], 0.95));
+    core.addColorStop(1, hexA(pal[0], 0));
+    g.fillStyle = core;
+    g.beginPath(); g.arc(cx,cy,Math.max(1,cr),0,Math.PI*2); g.fill();
+
+  } else if (style === 'kaleidoscope') {
+    const cx = W/2, cy = H/2, R = Math.min(W,H)*0.42, N = 8;
+    const rot = t*(0.15 + (state.bpm ? state.bpm/900 : 0.15));
+    g.save(); g.translate(cx, cy);
+    g.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < N; i++) {
+      g.save();
+      g.rotate(rot + i*2*Math.PI/N);
+      for (let j = 0; j < 5; j++) {
+        const rr = R*(0.18 + j*0.18)*(1 + (j%2 ? mid : tre)*0.22);
+        g.strokeStyle = hexA(pal[(i+j) % pal.length], 0.12 + 0.22*(1-j/5));
+        g.lineWidth = 1.5 + bass*4;
+        g.beginPath(); g.arc(0, 0, Math.max(1,rr), 0, Math.PI*0.75); g.stroke();
+      }
+      g.restore();
+    }
+    g.restore();
+    g.globalCompositeOperation = 'source-over';
+    const cr2 = Math.min(W,H)*(0.07 + bass*0.09);
+    const core2 = g.createRadialGradient(cx,cy,0,cx,cy,Math.max(1,cr2));
+    core2.addColorStop(0, hexA(pal[2], 0.8));
+    core2.addColorStop(1, hexA(pal[2], 0));
+    g.fillStyle = core2;
+    g.beginPath(); g.arc(cx,cy,Math.max(1,cr2),0,Math.PI*2); g.fill();
+
+  } else if (style === 'ribbon') {
+    const sr = state.buffer.sampleRate, spanSec = 3.0, t0 = t - spanSec/2;
+    const amp = Math.min(W,H)*0.22*(1 + bass*0.5);
+    g.globalCompositeOperation = 'lighter';
+    for (let layer = 0; layer < 2; layer++) {
+      g.strokeStyle = hexA(pal[layer], layer ? 0.55 : 0.95);
+      g.lineWidth = layer ? 2 : 3.5;
+      g.shadowBlur = layer ? 0 : 22;
+      g.shadowColor = hexA(pal[0], 0.9);
+      g.beginPath();
+      const steps = 420;
+      for (let i = 0; i <= steps; i++) {
+        const tt = t0 + (i/steps)*spanSec;
+        const idx = Math.max(0, Math.min(state.mono.length-1, Math.floor(tt*sr)));
+        const v = state.mono[idx] || 0;
+        const x = (i/steps)*W;
+        const y = H/2 + v*amp*(layer ? -1 : 1);
+        i ? g.lineTo(x,y) : g.moveTo(x,y);
+      }
+      g.stroke();
+    }
+    g.shadowBlur = 0;
+    g.globalCompositeOperation = 'source-over';
+    g.strokeStyle = hexA(pal[3], 0.25);
+    g.lineWidth = 1;
+    g.beginPath(); g.moveTo(0, H/2); g.lineTo(W, H/2); g.stroke();
+
+  } else { // bars
+    const mags = spec.mags, N = 56, bw = W/(N*1.6), cx = W/2;
+    g.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < N; i++) {
+      const k = Math.floor(Math.pow(i/N, 1.8) * (mags.length*0.5)) + 1;
+      let m = 0;
+      for (let j = k; j < k+2 && j < mags.length; j++) m = Math.max(m, mags[j]);
+      const v = Math.min(1, Math.log10(1+m)/2.2);
+      const hh = Math.max(2, v*H*0.36*(1 + pulse*0.2));
+      const x = cx + (i - N/2)*bw*1.6;
+      g.fillStyle = hexA(pal[i % 2 ? 1 : 0], 0.75);
+      g.fillRect(x, H/2 - hh, bw, hh);
+      g.fillStyle = hexA(pal[i % 2 ? 1 : 0], 0.35);
+      g.fillRect(x, H/2, bw, hh);
+    }
+    g.globalCompositeOperation = 'source-over';
+  }
+}
+
+/* ================= text ================= */
+function fitFont(g, text, maxW, startSize, weight) {
+  let size = startSize;
+  g.font = `${weight||700} ${size}px system-ui, -apple-system, sans-serif`;
+  let guard = 0;
+  while (g.measureText(text).width > maxW && size > 16 && guard++ < 60) {
+    size *= 0.95;
+    g.font = `${weight||700} ${size}px system-ui, -apple-system, sans-serif`;
+  }
+  return size;
+}
+
+function drawTexts(g, W, H, t) {
+  const pos = $('textPos').value;
+  for (const tx of state.texts) {
+    if (t < tx.start || t > tx.end) continue;
+    const L = Math.max(0.001, tx.end - tx.start);
+    const p = (t - tx.start)/L;
+    const fade = Math.max(0, Math.min(1, Math.min(p, 1-p)/0.10));
+    const isLyric = !!tx.lyric;
+    const base = isLyric ? H*0.072 : H*0.062;
+    const size = fitFont(g, tx.text, W*0.86, base, isLyric ? 800 : 700);
+    const y = pos === 'center' ? H*0.5 : (isLyric ? H*0.84 : H*0.86);
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.globalAlpha = fade;
+    g.lineWidth = size*0.17; g.strokeStyle = 'rgba(0,0,0,0.72)';
+    g.strokeText(tx.text, W/2, y);
+    g.fillStyle = '#ffffff';
+    g.fillText(tx.text, W/2, y);
+    g.globalAlpha = 1;
+  }
+}
+
+/* ================= frame ================= */
+function currentLyric(t) {
+  for (const tx of state.texts) {
+    if (tx.lyric && t >= tx.start && t <= tx.end) return tx;
+  }
+  return null;
+}
+
+function drawFrame(t) {
+  const cv = $('preview');
+  const [W, H] = targetSize();
+  if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
+  const g = cv.getContext('2d');
+  g.clearRect(0,0,W,H);
+  g.fillStyle = '#000'; g.fillRect(0,0,W,H);
+
+  // hue target from the active lyric line
+  const cur = currentLyric(t);
+  state.hueTarget = cur ? (cur.hue || 0) : 0;
+  state.lyricStyle = ($('lyricVisuals').checked && cur && cur.style) ? cur.style : null;
+  state.hueCur += (state.hueTarget - state.hueCur)*0.06;
+
+  const spec = spectrumAt(t);
+  state.bands = spec;
+  const pulse = beatPulse(t);
+  const source = $('source').value;
+
+  if (source === 'generative') {
+    const now = performance.now();
+    const dt = Math.min(0.05, (now - (state.lastT || now))/1000);
+    state.lastT = now;
+    drawGenerative(g, W, H, t, spec, pulse, dt);
+  } else {
+    const idx = sceneIndexAt(t);
+    const cut = $('cut').value;
+    if (idx >= 0) {
+      const sc = state.scenes[idx];
+      const L = Math.max(0.001, sc.end - sc.start);
+      const p = Math.min(1, Math.max(0, (t - sc.start)/L));
+      const img = state.images[sc.imageIndex];
+      if (img) drawKenBurns(g, img.img, W, H, p, 1, idx % 2 === 0 ? 1 : -1);
+      else {
+        const grad = g.createLinearGradient(0,0,W,H);
+        grad.addColorStop(0, '#141a25'); grad.addColorStop(1, '#241b30');
+        g.fillStyle = grad; g.fillRect(0,0,W,H);
+      }
+      if (cut === 'fade' && p > 0.82 && idx < state.scenes.length-1) {
+        const nxt = state.images[state.scenes[idx+1].imageIndex];
+        if (nxt) drawKenBurns(g, nxt.img, W, H, 0, (p-0.82)/0.18, (idx+1) % 2 === 0 ? 1 : -1);
+      }
+      if (cut === 'beatflash' && state.bpm > 0) {
+        const bd = 60/state.bpm, since = t % bd;
+        const a = Math.max(0, 1 - since/(bd*0.25))*0.32;
+        if (a > 0) { g.fillStyle = `rgba(255,255,255,${a})`; g.fillRect(0,0,W,H); }
+      }
+    }
+    if (state.analyser) {
+      const bins = new Uint8Array(state.analyser.frequencyBinCount);
+      state.analyser.getByteFrequencyData(bins);
+      const n = 72, bw = W/n;
+      g.fillStyle = $('accent').value; g.globalAlpha = 0.75;
+      for (let i = 0; i < n; i++) {
+        const v = bins[Math.floor(i*bins.length/n/3)]/255;
+        const bh = v*H*0.3;
+        g.fillRect(i*bw + bw*0.15, H - bh, bw*0.7, bh);
+      }
+      g.globalAlpha = 1;
+    }
+  }
+
+  drawTexts(g, W, H, t);
+
+  if ($('hud').checked) {
+    g.textAlign = 'left'; g.textBaseline = 'alphabetic';
+    g.font = '600 15px system-ui, sans-serif';
+    g.fillStyle = 'rgba(255,255,255,0.85)';
+    g.fillText(state.bpm ? state.bpm.toFixed(1)+' BPM' : '', 18, 30);
+    g.font = '400 12px system-ui, sans-serif';
+    g.fillStyle = 'rgba(255,255,255,0.6)';
+    g.fillText(t.toFixed(2)+'s', 18, 50);
+  }
+}
+
+/* ================= loop ================= */
+function loop() {
+  if (state.playing && state.audioCtx) state.playhead = state.audioCtx.currentTime - state.startedAt;
+  drawFrame(state.playhead);
+  state.rafId = requestAnimationFrame(loop);
+}
+
+/* ================= load ================= */
+async function buildMono(buf) {
+  const ch = buf.numberOfChannels;
+  const mono = new Float32Array(buf.length);
+  for (let c = 0; c < ch; c++) {
+    const d = buf.getChannelData(c);
+    for (let i = 0; i < d.length; i++) mono[i] += d[i]/ch;
+  }
+  return mono;
+}
+
+async function loadFile(file) {
+  setStatus('decoding…');
+  if (!state.audioCtx) state.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const arr = await file.arrayBuffer();
+
+  let art = null;
+  try { art = extractAlbumArt(new Uint8Array(arr)); } catch (e) { art = null; }
+
+  state.buffer = await state.audioCtx.decodeAudioData(arr.slice(0));
+  setStatus('analysing…');
+  await new Promise(r => setTimeout(r, 20));
+
+  state.mono = await buildMono(state.buffer);
+
+  const { flux, fps } = onsetEnvelope(state.mono, state.buffer.sampleRate, 512, 2048);
+  state.fps = fps;
+  const raw = pickPeaks(flux, 1.3);
+  const minGap = Math.round(0.06*fps);
+  state.onsets = [];
+  for (const f of raw) {
+    if (!state.onsets.length || f - state.onsets[state.onsets.length-1] >= minGap) state.onsets.push(f);
+  }
+  const tempo = estimateTempo(flux, fps);
+  state.bpm = tempo.bpm;
+  state.beatFrames = tempo.beatFrames;
+
+  state.scenes = detectScenes(state.buffer, state.beatFrames, state.fps, state.mono);
+  state.scenes.forEach(s => s.imageIndex = 0);
+  state.activeRegions = activeRegions(state.mono, state.buffer.sampleRate);
+  state.playhead = 0;
+  resetParticles();
+  buildPalette();
+
+  if (art) {
+    const img = new Image();
+    img.src = URL.createObjectURL(art);
+    try { await img.decode(); } catch (e) {}
+    state.images = [{ name: 'album art', img }];
+    $('imgCount').textContent = '1 image (album art)';
+    setStatus('album art found');
+  }
+
+  $('drop').classList.add('hidden');
+  $('studio').classList.remove('hidden');
+  $('info').textContent =
+    `${state.buffer.duration.toFixed(1)}s · ${state.scenes.length} scenes · ${state.onsets.length} onsets · ${state.bpm.toFixed(1)} BPM`;
+
+  reassignImages(true);
+  renderScenes();
+  drawWave();
+  applySourceUI();
+  if (!state.rafId) loop();
+  window.addEventListener('resize', () => drawWave());
+}
+
+/* ================= images / scenes / text ================= */
+function reassignImages(reset) {
+  const n = state.images.length;
+  state.scenes.forEach((s, i) => { s.imageIndex = n ? (reset ? i % n : (s.imageIndex + 1) % n) : 0; });
+  $('imgCount').textContent = n + (n === 1 ? ' image' : ' images');
+  renderScenes(); drawWave();
+}
+function renderScenes() {
+  const box = $('sceneList');
+  box.innerHTML = '';
+  if (!state.scenes.length) { box.innerHTML = '<div class="stat">No scenes yet.</div>'; return; }
+  state.scenes.forEach((s, i) => {
+    const row = document.createElement('div');
+    row.className = 'scene';
+    const opts = state.images.map((im, j) =>
+      `<option value="${j}"${j === s.imageIndex ? ' selected' : ''}>${escapeHtml(im.name.slice(0,32))}</option>`).join('');
+    row.innerHTML =
+      `<span>#${i+1}</span>
+       <span class="time">${fmt(s.start)} → ${fmt(s.end)}</span>
+       <span class="tag${s.loud ? ' loud' : ''}">${s.loud ? 'high energy' : 'low energy'}</span>
+       <select data-i="${i}" ${state.images.length ? '' : 'disabled'}>
+         ${opts || '<option>no images</option>'}
+       </select>`;
+    box.appendChild(row);
+  });
+  box.querySelectorAll('select').forEach(sel => {
+    sel.addEventListener('change', e => {
+      state.scenes[+e.target.dataset.i].imageIndex = +e.target.value;
+      drawWave();
+    });
+  });
+}
+function renderTexts() {
+  const box = $('textList');
+  box.innerHTML = '';
+  if (!state.texts.length) { box.innerHTML = '<div class="stat">No captions yet.</div>'; return; }
+  state.texts.forEach((tx, i) => {
+    const row = document.createElement('div');
+    row.className = 'scene';
+    row.innerHTML =
+      `<span>${tx.lyric ? '<span class="tag">lyric</span> ' : ''}“${escapeHtml(tx.text)}”</span>
+       <label>start <input type="number" step="0.1" value="${tx.start.toFixed(1)}" data-i="${i}" data-k="start" style="width:78px"></label>
+       <label>end <input type="number" step="0.1" value="${tx.end.toFixed(1)}" data-i="${i}" data-k="end" style="width:78px"></label>
+       <button class="ghost" data-del="${i}" style="padding:5px 10px">remove</button>`;
+    box.appendChild(row);
+  });
+  box.querySelectorAll('input[type=number]').forEach(inp => {
+    inp.addEventListener('change', e => {
+      state.texts[+e.target.dataset.i][e.target.dataset.k] = parseFloat(e.target.value) || 0;
+    });
+  });
+  box.querySelectorAll('button[data-del]').forEach(b => {
+    b.addEventListener('click', e => { state.texts.splice(+e.target.dataset.del, 1); renderTexts(); });
+  });
+}
+
+/* ================= playback ================= */
+function stop() {
+  if (state.source) { try { state.source.stop(); } catch (e) {} state.source = null; }
+  state.playing = false;
+  $('play').textContent = '▶ Play';
+}
+function buildGraph(extraDest) {
+  state.source = state.audioCtx.createBufferSource();
+  state.source.buffer = state.buffer;
+  state.analyser = state.audioCtx.createAnalyser();
+  state.analyser.fftSize = 2048;
+  state.gain = state.audioCtx.createGain();
+  state.source.connect(state.analyser);
+  state.analyser.connect(state.gain);
+  state.gain.connect(state.audioCtx.destination);
+  if (extraDest) state.gain.connect(extraDest);
+}
+function play() {
+  if (!state.buffer) return;
+  stop();
+  buildGraph(null);
+  resetParticles();
+  state.playhead = 0;
+  state.source.start();
+  state.startedAt = state.audioCtx.currentTime;
+  state.playing = true;
+  $('play').textContent = '⏸ Pause';
+}
+
+/* ================= export ================= */
+function startRecording() {
+  if (state.recording) { state.recorder.stop(); return; }
+  if (!state.buffer) return;
+  const cv = $('preview');
+  const dest = state.audioCtx.createMediaStreamDestination();
+  const stream = cv.captureStream(30);
+  dest.stream.getAudioTracks().forEach(t => stream.addTrack(t));
+
+  const types = ['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'];
+  const mime = types.find(t => window.MediaRecorder && MediaRecorder.isTypeSupported(t));
+  if (!mime) { setStatus('Recording unsupported in this browser'); return; }
+
+  state.chunks = [];
+  state.recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 8_000_000 });
+  state.recorder.ondataavailable = e => { if (e.data.size) state.chunks.push(e.data); };
+  state.recorder.onstop = () => {
+    const blob = new Blob(state.chunks, { type: 'video/webm' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'beatsync-video.webm';
+    a.click();
+    setStatus('export complete');
+    $('record').textContent = '⬇ Export video';
+    state.recording = false;
+  };
+
+  stop();
+  resetParticles();
+  buildGraph(dest);
+  state.playhead = 0;
+  state.source.onended = () => { if (state.recording && state.recorder.state === 'recording') state.recorder.stop(); };
+  state.source.start();
+  state.startedAt = state.audioCtx.currentTime;
+  state.playing = true;
+  state.recording = true;
+  $('record').textContent = '⏹ Stop & save';
+  setStatus('recording — plays from the start, real time');
+  state.recorder.start();
+}
+
+/* ================= helpers ================= */
+function fmt(s) {
+  const m = Math.floor(s/60), r = s - m*60;
+  return m + ':' + String(Math.floor(r)).padStart(2,'0');
+}
+function escapeHtml(s) {
+  return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function setStatus(s) { $('status').textContent = s; }
+function applySourceUI() {
+  const gen = $('source').value === 'generative';
+  $('styleWrap').classList.toggle('hidden', !gen);
+  $('imgRow').classList.toggle('hidden', gen);
+  $('scenesBlock').classList.toggle('hidden', gen);
+}
+
+/* ================= wiring ================= */
+const drop = $('drop');
+drop.addEventListener('click', () => $('file').click());
+$('file').addEventListener('change', e => { if (e.target.files[0]) loadFile(e.target.files[0]); });
+['dragenter','dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('hover'); }));
+['dragleave','drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('hover'); }));
+drop.addEventListener('drop', e => { const f = e.dataTransfer.files[0]; if (f) loadFile(f); });
+
+$('play').addEventListener('click', () => { state.playing ? stop() : play(); });
+$('record').addEventListener('click', startRecording);
+$('aspect').addEventListener('change', () => drawFrame(state.playhead));
+$('source').addEventListener('change', applySourceUI);
+$('style').addEventListener('change', () => resetParticles());
+$('accent').addEventListener('change', () => { buildPalette(); if (state.buffer) drawWave(); });
+
+$('imgs').addEventListener('change', async e => {
+  for (const f of e.target.files) {
+    const img = new Image();
+    img.src = URL.createObjectURL(f);
+    try { await img.decode(); } catch (err) {}
+    state.images.push({ name: f.name, img });
+  }
+  reassignImages(true);
+  setStatus(state.images.length + ' image(s) loaded');
+});
+$('shuffle').addEventListener('click', () => reassignImages(false));
+
+$('distribute').addEventListener('click', distributeLyrics);
+$('clearLyrics').addEventListener('click', () => {
+  state.texts = state.texts.filter(t => !t.lyric);
+  $('lyricInfo').textContent = '';
+  renderTexts();
+});
+$('lyrics').addEventListener('input', () => {
+  const n = $('lyrics').value.split(/\r?\n/).filter(l => l.trim()).length;
+  $('lyricInfo').textContent = n + ' lines pasted';
+});
+
+$('addText').addEventListener('click', () => {
+  const v = $('textInput').value.trim();
+  if (!v) return;
+  state.texts.push({ text: v, start: state.playhead, end: state.playhead + 3 });
+  $('textInput').value = '';
+  renderTexts();
+});
+</script>
+</body>
+</html>
