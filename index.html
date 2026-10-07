@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>BeatSync Studio v5</title>
+<title>My Video Maker</title>
 <style>
   :root { color-scheme: dark; --bg:#0b0d12; --panel:#10141c; --line:#1e2430; --line2:#2a3242; --txt:#e7e9ee; --dim:#9aa4b8; --acc:#5b8def; }
   * { box-sizing: border-box; }
@@ -62,14 +62,74 @@
   .card { background:#0e131b; border:1px solid var(--line); border-radius:10px; padding:12px; }
   .card b { display:block; font-size:13px; margin-bottom:4px; }
   .card span { font-size:12.5px; color:var(--dim); line-height:1.5; }
+
+  body {
+    font-size:16px;
+    background-color:#bfc3c9;
+    background-image:
+      repeating-linear-gradient(0deg, rgba(255,255,255,.12) 0px, rgba(255,255,255,.12) 1px, rgba(40,45,55,.05) 1px, transparent 3px),
+      linear-gradient(115deg, #8e949c 0%, #d7dade 18%, #a8adb5 36%, #f0f1f3 51%, #b6bbc2 68%, #d8dbe0 84%, #979da6 100%);
+    background-attachment:fixed;
+    min-height:100vh;
+  }
+  #drop {
+    background:
+      repeating-linear-gradient(0deg, rgba(255,255,255,.16) 0px, rgba(255,255,255,.16) 1px, transparent 1px, transparent 3px),
+      linear-gradient(115deg,#969da6 0%,#e3e6ea 24%,#b1b7bf 43%,#f3f4f6 56%,#a7aeb7 78%,#d9dde2 100%);
+    color:#111820;
+    border:2px dashed #414b59;
+    min-height:260px;
+    display:flex; flex-direction:column; justify-content:center;
+  }
+  #drop b { color:#173f78; }
+  #drop .stat { color:#263443; }
+  #drop.hover { border-color:#173f78; filter:brightness(1.05); }
+  .tabs { background:#10141c; border-radius:12px 12px 0 0; padding:4px; }
+
+  h1 { font-size:21px; }
+  button, .tab { font-size:17px; min-height:46px; padding:12px 18px; }
+  label, .stat, .clock, .item { font-size:16px; }
+  select, input[type=text], input[type=number] { font-size:17px; min-height:46px; padding:10px 12px; }
+  input[type=checkbox] { width:22px; height:22px; }
+  textarea { font-size:16px; }
+  .hint, .card span, #status { font-size:15px; color:#b8c5db; }
+  .panel h3, .card b { font-size:16px; }
+  button:focus-visible, select:focus-visible, input:focus-visible { outline:3px solid #a9caff; outline-offset:3px; }
+  header { flex-wrap:wrap; }
+  #renderStatus { border:2px solid #5b8def; border-radius:12px; padding:16px; background:#152438; }
+  #renderMessage { display:block; font-size:18px; margin-bottom:10px; }
+  #renderProgress { width:100%; height:22px; accent-color:#5b8def; }
+  /* Burgundy accents and bold, readable controls */
+  :root { --acc:#8b1828; }
+  h1 { color:#ffbdc5; font-weight:800; }
+  button, button.ghost, button.danger {
+    background:#85182a; color:#fff; font-weight:750;
+    border:1px solid #b44a5b;
+  }
+  button:hover:not(:disabled) { background:#a42137; }
+  .tab { background:#35151c; color:#f5c9cf; font-weight:750; }
+  .tab.on { background:#85182a; color:#fff; border-bottom-color:#ffbac6; }
+  label, .panel h3, .card b { font-weight:750; }
+  #drop, #drop b, #drop .stat { color:#751323; font-weight:750; }
+  #drop { border-color:#85182a; }
+  #drop.hover { border-color:#a42137; }
+  select, input[type=text], input[type=number] { border-color:#8b3443; font-weight:650; }
+  #renderStatus { border-color:#b44a5b; background:#28131a; }
+  #renderMessage { color:#ffd1d7; font-weight:750; }
+  #renderProgress { accent-color:#a42137; }
+  #drop { background:#0b0d12; color:#e7e9ee; border-color:#85182a; }
+  #drop b { color:#ffbdc5; }
+  #drop .stat { color:#c1c9d6; }
+  #drop.hover { background:#171017; filter:none; border-color:#b44a5b; }
 </style>
 </head>
 <body>
 
 <header>
-  <h1>BeatSync Studio</h1>
-  <span class="badge">local · nothing uploaded</span>
-  <span id="status"></span>
+  <h1>My Video Maker</h1>
+  <span class="badge">v1.4 · preview timer</span>
+  <button id="startOver" class="danger">↻ Start Over</button>
+  <span id="status" role="status"></span>
 </header>
 
 <div class="app">
@@ -81,10 +141,9 @@
   </div>
 
   <div id="studio" class="hidden stage">
-    <canvas id="preview"></canvas>
-
     <div class="transport">
       <button id="play">▶ Play</button>
+      <button id="largePreview" class="ghost">▣ Open Large Preview</button>
       <span class="clock" id="clock">0:00 / 0:00</span>
       <label>Format
         <select id="aspect">
@@ -96,8 +155,6 @@
       <label><input type="checkbox" id="hud" checked /> HUD</label>
       <span class="stat" id="info"></span>
     </div>
-
-    <canvas id="wave" height="96"></canvas>
 
     <div class="tabs">
       <button class="tab on" data-tab="song">Song</button>
@@ -141,7 +198,8 @@
         </label>
         <label id="styleWrap">Generator
           <select id="style">
-            <option value="gradient">Gradient flow</option>
+            <option value="none">None — no visualizer</option>
+            <option value="gradient" selected>Gradient flow</option>
             <option value="particles">Particles</option>
             <option value="kaleidoscope">Kaleidoscope</option>
             <option value="ribbon">Waveform ribbon</option>
@@ -154,7 +212,10 @@
       <div class="row">
         <label>Cut
           <select id="cut">
-            <option value="cut">Hard cut</option>
+            <option value="cut">Cut (instant change)</option>
+            <option value="fadein">Fade in from black</option>
+            <option value="fadeout">Fade out to black</option>
+            <option value="fadeboth">Fade out &amp; fade in</option>
             <option value="fade">Crossfade</option>
             <option value="beatflash">Flash on beat</option>
           </select>
@@ -173,20 +234,32 @@
       <div class="row">
         <label>Add images <input id="imgs" type="file" accept="image/*" multiple /></label>
         <button class="ghost" id="shuffle">Re-assign to sections</button>
+        <button class="ghost" id="removeArt" disabled>Remove album art</button>
         <span class="stat" id="imgCount">0 images</span>
       </div>
       <p class="hint">
         Select several at once (Ctrl/Shift-click). Album art is pulled from your MP3 automatically when present.
         Only used when Source = Images.
       </p>
-      <h3>Detected sections</h3>
+      <div class="row" style="margin-top:10px">
+        <label>Scene timing
+          <select id="sceneTiming">
+            <option value="energy">Song energy (automatic)</option>
+            <option value="timed">Seconds per image</option>
+          </select>
+        </label>
+        <label>Seconds per image <input id="secondsPerImage" type="number" min="1" max="300" step="1" value="15" style="width:85px" /></label>
+        <span id="imageSuggestion" class="stat"></span>
+      </div>
+<h3>Sections</h3>
       <div id="sceneList"></div>
     </div>
 
     <!-- LYRICS -->
     <div class="panel" id="tab-lyrics">
       <h3>Paste your lyrics</h3>
-      <textarea id="lyrics" placeholder="One line per line. Blank lines separate verses.
+      <p id="lyricsTimingNote" class="hint" style="font-weight:750;color:#ffd1d7;margin-bottom:12px">Lyrics may not line up with the music. Automatic timing is approximate; review the preview and adjust line timings as needed.</p>
+      <textarea id="lyrics" aria-describedby="lyricsTimingNote" placeholder="One line per line. Blank lines separate verses.
 
 No timestamps needed — lines are spread across the song, placed inside the non-silent regions,
 and snapped to the nearest beat."></textarea>
@@ -225,13 +298,21 @@ and snapped to the nearest beat."></textarea>
     <div class="panel" id="tab-export">
       <h3>Render</h3>
       <div class="row">
-        <button id="record">⬇ Export video</button>
+        <button id="record">⬇ Export MP4</button>
+        <label id="verticalLengthLabel">9:16 video length
+          <select id="verticalLength">
+            <option value="full">Full song</option>
+            <option value="60">1 minute</option>
+            <option value="120">2 minutes</option>
+          </select>
+        </label>
         <span class="stat" id="exportInfo"></span>
+        <p class="hint" style="width:100%">The length selection applies to 9:16 vertical exports. Widescreen exports use the full song.</p>
       </div>
       <div class="grid2" style="margin-top:14px">
         <div class="card"><b>Keep this tab in the foreground</b><span>Background throttling drops frames into your video. Let it run.</span></div>
         <div class="card"><b>Real time</b><span>A 3-minute song takes about 3 minutes to render. You can stop early and keep the partial file.</span></div>
-        <div class="card"><b>Output is .webm</b><span>Plays in Chrome, Firefox, VLC and most editors. Not always in QuickTime.</span></div>
+        <div class="card"><b>Output is .mp4</b><span>Uses native MP4 recording when supported by this browser. Unsupported browsers show a message before recording starts.</span></div>
         <div class="card"><b>HUD toggle</b><span>Turn the HUD off in the transport bar for a clean export with no burned-in numbers.</span></div>
       </div>
       <p class="hint">
@@ -239,6 +320,16 @@ and snapped to the nearest beat."></textarea>
         Audio and images are never stored — you re-select the song after a refresh.
       </p>
     </div>
+
+    <div id="renderStatus" class="hidden" role="status" aria-live="polite">
+      <strong id="renderMessage">Ready to render</strong>
+      <progress id="renderProgress" max="100" value="0" aria-label="Video rendering progress"></progress>
+      <div id="renderTime" class="stat"></div>
+    </div>
+    <canvas id="preview"></canvas>
+
+    <canvas id="wave" height="96"></canvas>
+
 
   </div>
 </div>
@@ -250,10 +341,10 @@ const $ = id => document.getElementById(id);
 /* ================= state ================= */
 const state = {
   audioCtx:null, buffer:null, mono:null, bpm:0, onsets:[], beatFrames:[], fps:86.13,
-  scenes:[], images:[], texts:[],
+  scenes:[], energyScenes:[], images:[], texts:[],
   playing:false, startedAt:0, playhead:0, duration:0, rafId:0, lastT:0,
   source:null, analyser:null, gain:null,
-  recorder:null, chunks:[], recording:false,
+  recorder:null, chunks:[], recording:false, exportDuration:0,
   particles:[], bands:{bass:0,mid:0,treble:0}, palette:[],
   hueCur:0, hueTarget:0, palCache:{}, lyricStyle:null, activeRegions:null
 };
@@ -717,11 +808,12 @@ function newParticle(W, H, scatter) {
   return p;
 }
 function drawGenerative(g, W, H, t, spec, pulse, dt) {
-  const style = state.lyricStyle || $('style').value;
+  const style = $('style').value === 'none' ? 'none' : (state.lyricStyle || $('style').value);
   const pal = livePalette();
   const bass = spec.bass, mid = spec.mid, tre = spec.treble;
   g.fillStyle = '#07080c'; g.fillRect(0,0,W,H);
 
+  if (style === 'none') return;
   if (style === 'gradient') {
     g.globalCompositeOperation = 'lighter';
     for (let i = 0; i < 3; i++) {
@@ -913,7 +1005,7 @@ function drawFrame(t) {
         if (a > 0) { g.fillStyle = `rgba(255,255,255,${a})`; g.fillRect(0,0,W,H); }
       }
     }
-    if (state.analyser) {
+    if (state.analyser && $('style').value !== 'none') {
       const bins = new Uint8Array(state.analyser.frequencyBinCount);
       state.analyser.getByteFrequencyData(bins);
       const n = 72, bw = W/n;
@@ -928,6 +1020,27 @@ function drawFrame(t) {
 
   drawTexts(g, W, H, t);
 
+  // Apply scene fades to the finished visual, including captions.
+  const transition = $('cut').value;
+  const fadeSceneIndex = sceneIndexAt(t);
+  if (fadeSceneIndex >= 0 && ['fadein','fadeout','fadeboth'].includes(transition)) {
+    const scene = state.scenes[fadeSceneIndex];
+    const fadeDuration = Math.min(0.75, Math.max(0.001, (scene.end - scene.start) / 2));
+    let darkness = 0;
+    if (transition === 'fadein' || transition === 'fadeboth')
+      darkness = Math.max(darkness, 1 - (t - scene.start) / fadeDuration);
+    if (transition === 'fadeout' || transition === 'fadeboth')
+      darkness = Math.max(darkness, 1 - (scene.end - t) / fadeDuration);
+    darkness = Math.max(0, Math.min(1, darkness));
+    if (darkness > 0) {
+      g.save();
+      g.globalAlpha = darkness;
+      g.fillStyle = '#000';
+      g.fillRect(0, 0, W, H);
+      g.restore();
+    }
+  }
+
   if ($('hud').checked) {
     g.textAlign = 'left'; g.textBaseline = 'alphabetic';
     g.font = '600 15px system-ui, sans-serif';
@@ -939,6 +1052,55 @@ function drawFrame(t) {
   }
 }
 
+let previewWindow = null;
+$('largePreview').addEventListener('click', () => {
+  if (previewWindow && !previewWindow.closed) { previewWindow.focus(); return; }
+  previewWindow = window.open('', 'myVideoMakerPreview', 'popup,width=1100,height=750');
+  if (!previewWindow) { setStatus('Allow pop-ups to open the large preview.'); return; }
+  previewWindow.document.write(`<!doctype html><html><head><title>My Video Maker — Preview</title>
+    <style>body{margin:0;background:#080a0e;color:white;font-family:system-ui}
+    main{height:100vh;display:flex;flex-direction:column}nav{padding:12px;display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+    button{font-size:18px;padding:12px 18px;border:0;border-radius:8px;background:#85182a;color:white;font-weight:750;cursor:pointer}
+    canvas{min-height:0;flex:1;width:100%;object-fit:contain}span{font-size:16px}  /* Burgundy accents and bold, readable controls */
+  :root { --acc:#8b1828; }
+  h1 { color:#ffbdc5; font-weight:800; }
+  button, button.ghost, button.danger {
+    background:#85182a; color:#fff; font-weight:750;
+    border:1px solid #b44a5b;
+  }
+  button:hover:not(:disabled) { background:#a42137; }
+  .tab { background:#35151c; color:#f5c9cf; font-weight:750; }
+  .tab.on { background:#85182a; color:#fff; border-bottom-color:#ffbac6; }
+  label, .panel h3, .card b { font-weight:750; }
+  #drop, #drop b, #drop .stat { color:#751323; font-weight:750; }
+  #drop { border-color:#85182a; }
+  #drop.hover { border-color:#a42137; }
+  select, input[type=text], input[type=number] { border-color:#8b3443; font-weight:650; }
+  #renderStatus { border-color:#b44a5b; background:#28131a; }
+  #renderMessage { color:#ffd1d7; font-weight:750; }
+  #renderProgress { accent-color:#a42137; }
+  #drop { background:#0b0d12; color:#e7e9ee; border-color:#85182a; }
+  #drop b { color:#ffbdc5; }
+  #drop .stat { color:#c1c9d6; }
+  #drop.hover { background:#171017; filter:none; border-color:#b44a5b; }
+</style></head>
+    <body><main id="view"><nav><button id="full">Full Screen</button><button id="close">Close Preview</button>
+    <strong id="previewClock" role="timer" style="font-size:20px;font-variant-numeric:tabular-nums;white-space:nowrap">0:00 / 0:00</strong>
+    <span>Press Esc to leave full screen.</span></nav><canvas id="largeCanvas"></canvas></main></body></html>`);
+  previewWindow.document.close();
+  const win = previewWindow;
+  win.document.getElementById('close').onclick = () => win.close();
+  win.document.getElementById('full').onclick = async () => {
+    try {
+      if (win.document.fullscreenElement) await win.document.exitFullscreen();
+      else await win.document.getElementById('view').requestFullscreen();
+    } catch (_) { win.document.querySelector('span').textContent = 'Use the window maximize button for a larger view.'; }
+  };
+  win.document.addEventListener('fullscreenchange', () => {
+    win.document.getElementById('full').textContent = win.document.fullscreenElement ? 'Exit Full Screen' : 'Full Screen';
+  });
+});
+window.addEventListener('beforeunload', () => { if (previewWindow && !previewWindow.closed) previewWindow.close(); });
 /* ================= loop ================= */
 function fmtClock(s) {
   if (!isFinite(s) || s < 0) s = 0;
@@ -950,7 +1112,29 @@ function loop() {
     state.playhead = state.audioCtx.currentTime - state.startedAt;
     $('clock').textContent = fmtClock(state.playhead) + ' / ' + fmtClock(state.duration);
   }
+  if (state.recording) {
+    const elapsed = Math.min(state.playhead, state.exportDuration);
+    $('renderProgress').value = state.duration ? elapsed / state.exportDuration * 100 : 0;
+    $('renderTime').textContent = fmtClock(elapsed) + ' / ' + fmtClock(state.exportDuration) +
+      ' · About ' + fmtClock(Math.max(0, state.exportDuration - elapsed)) + ' remaining';
+  }
+  const clockDuration = state.recording ? state.exportDuration : state.duration;
+  $('clock').textContent = fmtClock(Math.min(state.playhead, clockDuration)) + ' / ' + fmtClock(clockDuration);
   drawFrame(state.playhead);
+  if (previewWindow && !previewWindow.closed) {
+    const previewDuration = state.recording ? state.exportDuration : state.duration;
+    const timer = previewWindow.document.getElementById('previewClock');
+    if (timer) timer.textContent = fmtClock(Math.min(state.playhead, previewDuration)) +
+      ' / ' + fmtClock(previewDuration) + (state.recording ? ' · Rendering' : '');
+    const pc = previewWindow.document.getElementById('largeCanvas');
+    if (pc) {
+      const source = $('preview');
+      if (pc.width !== source.width || pc.height !== source.height) {
+        pc.width = source.width; pc.height = source.height;
+      }
+      pc.getContext('2d').drawImage(source, 0, 0);
+    }
+  }
   state.rafId = requestAnimationFrame(loop);
 }
 
@@ -964,9 +1148,14 @@ async function buildMono(buf) {
   }
   return mono;
 }
+function reportLoadError(err) {
+  setStatus('Song loading failed: ' + (err.message || String(err)));
+}
 async function loadFile(file) {
+  stop();
   setStatus('decoding…');
   if (!state.audioCtx) state.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  await state.audioCtx.resume();
   const arr = await file.arrayBuffer();
   let art = null;
   try { art = extractAlbumArt(new Uint8Array(arr)); } catch (e) { art = null; }
@@ -987,7 +1176,8 @@ async function loadFile(file) {
   state.bpm = tempo.bpm;
   state.beatFrames = tempo.beatFrames;
 
-  state.scenes = detectScenes(state.buffer, state.beatFrames, state.fps, state.mono);
+  state.energyScenes = detectScenes(state.buffer, state.beatFrames, state.fps, state.mono);
+  state.scenes = buildScenesForTiming();
   state.scenes.forEach(s => s.imageIndex = 0);
   state.activeRegions = activeRegions(state.mono, state.buffer.sampleRate);
   state.playhead = 0;
@@ -998,7 +1188,7 @@ async function loadFile(file) {
     const img = new Image();
     img.src = URL.createObjectURL(art);
     try { await img.decode(); } catch (e) {}
-    state.images = [{ name: 'album art', img }];
+    state.images = [{ name: 'album art', img, isAlbumArt: true }];
     $('imgCount').textContent = '1 image (album art)';
   }
 
@@ -1008,7 +1198,7 @@ async function loadFile(file) {
   $('info').textContent = line;
   $('songInfo').textContent = line;
   $('clock').textContent = '0:00 / ' + fmtClock(state.duration);
-  $('exportInfo').textContent = `${targetSize()[0]}×${targetSize()[1]} · ${fmtClock(state.duration)} real-time render`;
+  updateExportInfo();
 
   reassignImages(true);
   drawWave();
@@ -1019,10 +1209,47 @@ async function loadFile(file) {
 }
 
 /* ================= lists ================= */
+function secondsPerImage() {
+  const input = $('secondsPerImage');
+  const value = Number(input.value);
+  const seconds = Number.isFinite(value) && value >= 1 ? Math.min(300, value) : 15;
+  input.value = seconds;
+  return seconds;
+}
+function buildScenesForTiming() {
+  if ($('sceneTiming').value === 'energy') return state.energyScenes.map(scene => ({ ...scene }));
+  const duration = state.buffer.duration;
+  const seconds = secondsPerImage();
+  const count = Math.ceil(duration / seconds);
+  return Array.from({ length: count }, (_, i) => ({
+    start: i * seconds, end: Math.min(duration, (i + 1) * seconds), loud: false, imageIndex: 0
+  }));
+}
+function updateImageSuggestion() {
+  if (!state.buffer) return;
+  const seconds = secondsPerImage();
+  const count = Math.ceil(state.buffer.duration / seconds);
+  const timed = $('sceneTiming').value === 'timed';
+  $('imageSuggestion').textContent = `${count} images suggested at ${seconds}s each` +
+    (timed ? ` · ${state.images.length} loaded` : ` · energy mode uses ${state.scenes.length} scenes`);
+}
+function rebuildSceneTiming() {
+  if (!state.buffer || state.recording) return;
+  state.scenes = buildScenesForTiming();
+  reassignImages(true);
+  updateImageSuggestion();
+  const line = `${fmtClock(state.duration)} · ${state.scenes.length} sections · ${state.onsets.length} onsets · ${state.bpm.toFixed(1)} BPM`;
+  $('info').textContent = line;
+  $('songInfo').textContent = line;
+  saveSettings();
+  drawFrame(state.playhead);
+}
 function reassignImages(reset) {
   const n = state.images.length;
   state.scenes.forEach((s, i) => { s.imageIndex = n ? (reset ? i % n : (s.imageIndex + 1) % n) : 0; });
   $('imgCount').textContent = n + (n === 1 ? ' image' : ' images');
+  updateImageSuggestion();
+  $('removeArt').disabled = state.recording || !state.images.some(im => im.isAlbumArt);
   renderScenes(); drawWave();
 }
 function renderScenes() {
@@ -1042,6 +1269,7 @@ function renderScenes() {
   });
   box.querySelectorAll('select').forEach(sel =>
     sel.addEventListener('change', e => {
+      if (state.recording) return;
       state.scenes[+e.target.dataset.i].imageIndex = +e.target.value;
       drawWave();
     }));
@@ -1101,53 +1329,141 @@ function buildGraph(extraDest) {
   state.gain.connect(state.audioCtx.destination);
   if (extraDest) state.gain.connect(extraDest);
 }
-function play() {
-  if (!state.buffer) return;
-  stop(); buildGraph(null); resetParticles();
-  state.playhead = 0; state.source.start();
-  state.startedAt = state.audioCtx.currentTime;
-  state.playing = true;
-  $('play').textContent = '⏸ Pause';
+async function play() {
+  if (!state.buffer || state.recording) return;
+  try {
+    await state.audioCtx.resume();
+    stop(); buildGraph(null); resetParticles();
+    state.playhead = 0;
+    state.startedAt = state.audioCtx.currentTime;
+    state.playing = true;
+    state.source.onended = () => {
+      if (!state.recording) { state.playhead = state.duration; stop(); }
+    };
+    state.source.start();
+    $('play').textContent = '⏸ Pause';
+    setStatus('playing');
+  } catch (err) { stop(); setStatus('Playback failed: ' + err.message); }
 }
 
 /* ================= export ================= */
-function startRecording() {
-  if (state.recording) { state.recorder.stop(); return; }
+async function startRecording() {
+  if (state.recording) {
+    if (state.recorder.state === 'recording') state.recorder.stop();
+    return;
+  }
   if (!state.buffer) return;
   const cv = $('preview');
-  const dest = state.audioCtx.createMediaStreamDestination();
-  const stream = cv.captureStream(30);
-  dest.stream.getAudioTracks().forEach(t => stream.addTrack(t));
-  const types = ['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'];
-  const mime = types.find(t => window.MediaRecorder && MediaRecorder.isTypeSupported(t));
-  if (!mime) { setStatus('Recording unsupported in this browser'); return; }
-
-  state.chunks = [];
-  state.recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 8_000_000 });
-  state.recorder.ondataavailable = e => { if (e.data.size) state.chunks.push(e.data); };
-  state.recorder.onstop = () => {
-    const blob = new Blob(state.chunks, { type: 'video/webm' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'beatsync-video.webm';
-    a.click();
-    setStatus('export complete');
-    $('record').textContent = '⬇ Export video';
+  const types = [
+    'video/mp4;codecs=avc1.424028,mp4a.40.2',
+    'video/mp4;codecs=avc1,mp4a.40.2',
+    'video/mp4'
+  ];
+  if (!window.MediaRecorder || !cv.captureStream) {
+    setStatus('Video recording is unavailable in this browser.');
+    return;
+  }
+  const supported = types.filter(t => MediaRecorder.isTypeSupported(t));
+  if (!supported.length) {
+    setStatus('MP4 recording is unavailable here. Try an updated Chrome, Edge, or Safari browser.');
+    return;
+  }
+  $('record').disabled = true;
+  $('renderStatus').classList.remove('hidden');
+  $('renderProgress').value = 0;
+  $('renderMessage').textContent = 'Preparing MP4 rendering…';
+  $('renderTime').textContent = 'Please keep this tab open.';
+  let stream = null, dest = null;
+  const controls = ['verticalLength','startOver','play','aspect','cut','source','style','accent','hud','imgs','shuffle','removeArt','addText','sceneTiming','secondsPerImage','reload','textPos','lyricVisuals','lyrics','distribute','clearLyrics'];
+  const savedDisabled = controls.map(id => [$(id), $(id).disabled]);
+  function cleanup() {
     state.recording = false;
-  };
-  stop(); resetParticles(); buildGraph(dest);
-  state.playhead = 0;
-  state.source.onended = () => { if (state.recording && state.recorder.state === 'recording') state.recorder.stop(); };
-  state.source.start();
-  state.startedAt = state.audioCtx.currentTime;
-  state.playing = true; state.recording = true;
-  $('record').textContent = '⏹ Stop & save';
-  setStatus('recording — keep this tab in front');
-  state.recorder.start();
+    stop();
+    state.playhead = Math.min(state.playhead, state.buffer.duration);
+    if (stream) stream.getTracks().forEach(track => track.stop());
+    if (dest) { try { state.gain.disconnect(dest); } catch (_) {} }
+    savedDisabled.forEach(([el, disabled]) => el.disabled = disabled);
+    $('record').disabled = false;
+    $('record').textContent = '⬇ Export MP4';
+  }
+  let failed = false;
+  try {
+    await state.audioCtx.resume();
+    stop();
+    state.playhead = 0;
+    resetParticles();
+    drawFrame(0);
+    dest = state.audioCtx.createMediaStreamDestination();
+    stream = cv.captureStream(30);
+    dest.stream.getAudioTracks().forEach(track => stream.addTrack(track));
+    let recorder = null;
+    for (const mimeType of supported) {
+      try {
+        recorder = new MediaRecorder(stream, {
+          mimeType, videoBitsPerSecond: 8_000_000, audioBitsPerSecond: 192_000
+        });
+        break;
+      } catch (_) { /* Try the next supported MP4 configuration. */ }
+    }
+    if (!recorder) throw new Error('The browser could not initialize its MP4 encoder.');
+    state.recorder = recorder;
+    const chunks = [];
+    recorder.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
+    recorder.onerror = e => {
+      failed = true;
+      setStatus('MP4 export failed: ' + (e.error?.message || 'encoder error'));
+      cleanup();
+    };
+    recorder.onstop = () => {
+      $('renderMessage').textContent = 'Finishing MP4… Preparing download.';
+      cleanup();
+      if (failed) return;
+      if (!chunks.length) { setStatus('No video data was recorded. Please try again.'); return; }
+      const actualType = recorder.mimeType || chunks[0].type;
+      if (!actualType.toLowerCase().startsWith('video/mp4')) {
+        setStatus('The browser returned a non-MP4 format; export was cancelled.');
+        return;
+      }
+      const blob = new Blob(chunks, { type: actualType });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const lengthTag = $('aspect').value === '9:16' && $('verticalLength').value !== 'full'
+        ? '-' + Math.round(state.exportDuration) + 's' : '-full';
+      a.download = 'my-video-maker-' + $('aspect').value.replace(':', 'x') + lengthTag + '.mp4';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      $('renderMessage').textContent = 'MP4 ready — download started.';
+      $('renderTime').textContent = 'Check your browser downloads for the video.';
+      setStatus('MP4 export complete');
+    };
+    buildGraph(dest);
+    state.source.onended = () => {
+      if (state.recording && recorder.state === 'recording') recorder.stop();
+    };
+    savedDisabled.forEach(([el]) => el.disabled = true);
+    state.exportDuration = exportLength();
+    state.recording = true;
+    recorder.start(1000);
+    state.startedAt = state.audioCtx.currentTime;
+    state.playing = true;
+    state.source.start(0, 0, state.exportDuration);
+    $('record').disabled = false;
+    $('record').textContent = '⏹ Stop & save MP4';
+    $('renderMessage').textContent = 'Rendering MP4… Your download will start when finished.';
+    setStatus('Rendering MP4…');
+  } catch (err) {
+    failed = true;
+    if (state.recorder && state.recorder.state === 'recording') state.recorder.stop();
+    cleanup();
+    setStatus('MP4 export failed: ' + err.message);
+  }
 }
 
 /* ================= settings persistence ================= */
-const SETTING_IDS = ['aspect','cut','source','style','accent','hud','textPos','lyricVisuals'];
+const SETTING_IDS = ['verticalLength','aspect','cut','source','style','accent','hud','textPos','lyricVisuals','sceneTiming','secondsPerImage'];
 function saveSettings() {
   try {
     const s = {};
@@ -1166,6 +1482,7 @@ function loadSettings() {
   SETTING_IDS.forEach(id => {
     if (!(id in s)) return;
     const el = $(id);
+    if (el.tagName === 'SELECT' && !Array.from(el.options).some(o => o.value === String(s[id]))) return;
     if (el.type === 'checkbox') el.checked = !!s[id]; else el.value = s[id];
   });
   if (s.lyrics) $('lyrics').value = s.lyrics;
@@ -1175,19 +1492,35 @@ function loadSettings() {
 function escapeHtml(s) {
   return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
-function setStatus(s) { $('status').textContent = s; }
+function exportLength() {
+  const selected = $('verticalLength').value;
+  return $('aspect').value === '9:16' && selected !== 'full'
+    ? Math.min(state.duration, Number(selected)) : state.duration;
+}
+function updateExportInfo() {
+  $('verticalLengthLabel').classList.remove('hidden');
+  if (state.buffer) $('exportInfo').textContent =
+    targetSize()[0] + '×' + targetSize()[1] + ' · ' + fmtClock(exportLength()) + ' real-time render';
+}
+function setStatus(s) {
+  $('status').textContent = s;
+  if (/failed|cancelled|No video data/.test(s)) {
+    $('renderMessage').textContent = s;
+    $('renderTime').textContent = 'You can try exporting again.';
+  }
+}
 function applySourceUI() {
   const gen = $('source').value === 'generative';
-  $('styleWrap').classList.toggle('hidden', !gen);
+  $('styleWrap').classList.remove('hidden');
 }
 
 /* ================= wiring ================= */
 const drop = $('drop');
 drop.addEventListener('click', () => $('file').click());
-$('file').addEventListener('change', e => { if (e.target.files[0]) loadFile(e.target.files[0]); });
+$('file').addEventListener('change', e => { if (e.target.files[0]) loadFile(e.target.files[0]).catch(reportLoadError); });
 ['dragenter','dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('hover'); }));
 ['dragleave','drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('hover'); }));
-drop.addEventListener('drop', e => { const f = e.dataTransfer.files[0]; if (f) loadFile(f); });
+drop.addEventListener('drop', e => { const f = e.dataTransfer.files[0]; if (f) loadFile(f).catch(reportLoadError); });
 
 document.querySelectorAll('.tab').forEach(btn =>
   btn.addEventListener('click', () => {
@@ -1197,9 +1530,17 @@ document.querySelectorAll('.tab').forEach(btn =>
 
 $('play').addEventListener('click', () => { state.playing ? stop() : play(); });
 $('record').addEventListener('click', startRecording);
+$('startOver').addEventListener('click', () => {
+  if (state.recording) return;
+  if (!confirm('Start over? This clears the loaded song, images, lyrics, captions, and saved settings. Your original files stay on your computer.')) return;
+  stop();
+  try { localStorage.removeItem('beatsync.settings'); } catch (_) {}
+  window.location.reload();
+});
+$('verticalLength').addEventListener('change', updateExportInfo);
 $('reload').addEventListener('click', () => $('file').click());
 $('aspect').addEventListener('change', () => { drawFrame(state.playhead); saveSettings();
-  if (state.buffer) $('exportInfo').textContent = `${targetSize()[0]}×${targetSize()[1]} · ${fmtClock(state.duration)} real-time render`; });
+  updateExportInfo(); });
 $('source').addEventListener('change', () => { applySourceUI(); saveSettings(); });
 $('style').addEventListener('change', () => { resetParticles(); saveSettings(); });
 $('accent').addEventListener('change', () => { buildPalette(); if (state.buffer) drawWave(); saveSettings(); });
@@ -1217,6 +1558,30 @@ $('imgs').addEventListener('change', async e => {
   setStatus(state.images.length + ' image(s) loaded');
 });
 $('shuffle').addEventListener('click', () => reassignImages(false));
+$('sceneTiming').addEventListener('change', rebuildSceneTiming);
+$('secondsPerImage').addEventListener('change', rebuildSceneTiming);
+$('removeArt').addEventListener('click', () => {
+  if (state.recording) return;
+  const oldImages = state.images;
+  const remaining = oldImages.filter(im => !im.isAlbumArt);
+  if (remaining.length === oldImages.length) return;
+  // Preserve the image chosen for each scene when its image remains loaded.
+  state.scenes.forEach((scene, i) => {
+    const keptIndex = remaining.indexOf(oldImages[scene.imageIndex]);
+    scene.imageIndex = keptIndex >= 0 ? keptIndex : (remaining.length ? i % remaining.length : 0);
+  });
+  oldImages.filter(im => im.isAlbumArt).forEach(im => URL.revokeObjectURL(im.img.src));
+  state.images = remaining;
+  updateImageSuggestion();
+  $('imgCount').textContent = remaining.length + (remaining.length === 1 ? ' image' : ' images');
+  $('removeArt').disabled = true;
+  renderScenes();
+  drawWave();
+  drawFrame(state.playhead);
+  setStatus(remaining.length ? 'Album art removed' : 'Album art removed — add images to continue');
+});
+
+
 
 $('distribute').addEventListener('click', () => { distributeLyrics(); saveSettings(); });
 $('clearLyrics').addEventListener('click', () => {
@@ -1240,6 +1605,7 @@ $('addText').addEventListener('click', () => {
 
 /* ================= boot ================= */
 loadSettings();
+updateExportInfo();
 buildPalette();
 renderTexts();
 </script>
